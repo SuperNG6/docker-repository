@@ -1,0 +1,69 @@
+name: build-warp-socks5
+
+on:
+  # 允许手动触发
+  workflow_dispatch:
+  # 定期触发 (每月5号 08:80 UTC)
+  schedule:
+    - cron: '50 8 5 * *'
+
+jobs:
+  buildx:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # 需要权限来推送代码更改 (version.txt, README.md)
+      packages: write # 如果要推送到 GHCR 而不是 Docker Hub，需要这个
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+        with:
+          # 需要获取提交历史来比较版本，并推送更改
+          fetch-depth: 0 # 获取所有历史记录，以便进行提交和推送
+
+      - name: 设置 QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: 设置 Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        # 如果 buildx 实例已存在，重用它以可能利用缓存
+        with:
+          install: true
+
+      - name: 登录到 Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: 设置版本标签
+        id: set-version # 设置步骤 ID，以便后续引用其输出
+        run: |
+          # 生成 YY-MM-DD 格式的日期标签
+          VERSION_TAG=$(date +"%y-%m-%d")
+
+          # 将输出变量写入 $GITHUB_OUTPUT 文件 (替代已弃用的 ::set-output)
+          echo "version=${VERSION_TAG}" >> $GITHUB_OUTPUT
+          echo "status=success" >> $GITHUB_OUTPUT # 假设总是成功设置
+
+          # 在日志中打印生成的标签，方便查看
+          echo "生成的版本标签: ${VERSION_TAG}"
+        shell: bash # 明确指定使用 bash shell
+
+      - name: 构建并推送镜像
+        # 使用上一步输出的状态作为条件 (虽然这里总是 true)
+        if: steps.set-version.outputs.status == 'success'
+        uses: docker/build-push-action@v6 # 更新到 v6
+        with:
+          # Docker 构建上下文路径
+          context: ./warp-socks5
+          file: ./warp-socks5/Dockerfile # Dockerfile 文件路径
+          platforms: linux/amd64,linux/arm64 # 需要构建的平台架构
+          push: true # 推送构建好的镜像
+          # 为镜像打上标签
+          tags: |
+            superng6/warp-socks5:${{ steps.set-version.outputs.version }}
+            superng6/warp-socks5:latest
+          # 启用 BuildKit 缓存，利用 GitHub Actions 缓存加速后续构建
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
