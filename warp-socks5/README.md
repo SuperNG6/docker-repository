@@ -31,3 +31,18 @@ print(response.text)
 ```
 
 curl --socks5 127.0.0.1:40000 https://www.cloudflare.com/cdn-cgi/trace
+
+```
+  warp:
+    image: superng6/warp-socks5:latest
+    restart: always
+    environment:
+      - PORT=40000
+    ports:
+      - 40000:40000
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+```

@@ -10,6 +10,8 @@ RUN apk add --no-cache curl \
 
 FROM alpine:3.21
 
+ENV PORT=40000
+
 COPY --from=builder /app/wgcf /usr/bin/wgcf
 COPY --from=builder /app/wireproxy /usr/bin/wireproxy
 
@@ -19,7 +21,7 @@ COPY warp-health-check.sh /usr/local/bin/warp-health-check.sh
 RUN apk add --no-cache curl \
   && chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/warp-health-check.sh
 
-EXPOSE 40000/tcp
+EXPOSE ${PORT}/tcp 
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
